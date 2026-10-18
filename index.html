@@ -2522,7 +2522,10 @@ function showChapter2() {
   showChapter3();
   // cards
   const th = THEORY[step];
-  $('th').classList.toggle('show', !!th);
+  clearTimeout(thTimer);
+  const wait = thHold - performance.now();
+  if (th && wait > 0) { $('th').classList.remove('show'); thTimer = setTimeout(() => { if (THEORY[step]) $('th').classList.add('show'); }, wait); }
+  else $('th').classList.toggle('show', !!th);
   $('th').classList.toggle('side', step >= 17);
   if (th) { $('th-tag').textContent = th[0]; const lg = typeof th[3] === 'string' ? { src: th[3] } : th[3];                  // logo: before the title, or after it in place of the name
     const img = lg ? `<img class="logo${lg.after ? ' word' : ''}${th[1] ? '' : ' solo'}" src="${lg.src}" alt="${lg.alt || ''}">` : '';
@@ -2765,10 +2768,12 @@ function playChat(key, instant = false) {
   }, 45); }, 700);
 }
 const aimAt = (obj) => { const p = lead.worldToLocal(obj.getWorldPosition(new V3())).sub(EYE); return { yaw: Math.atan2(-p.x, -p.z), pitch: Math.atan2(p.y, Math.hypot(p.x, p.z)) }; };
+let thHold = 0, thTimer = null;
 function goStep(n) {
   if (state !== 'cockpit') return;
   n = Math.max(0, Math.min(STEP_COUNT - 1, n));
   if (n === step) return;
+  thHold = step < 17 && n >= 17 ? performance.now() + 1700 : 0;   // entering chapter 3: zoom onto the navigator first, card after
   step = n;
   $('info').classList.remove('show'); $('hint').classList.remove('show');
   gsap.killTweensOf(look);
