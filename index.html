@@ -1705,6 +1705,7 @@ function makeCockpit() {
       put(new THREE.CylinderGeometry(0.004, 0.004, 0.003, 14), M(0x8a8a8a, 0.3, 0.8), c.x, c.y, c.z + 0.009, Math.PI / 2);
       put(new THREE.PlaneGeometry(0.018, 0.007), M(0x2a2a2a, 0.5), c.x, c.y - 0.017, c.z); }
     const collar = put(new THREE.CylinderGeometry(0.024, 0.024, 0.035, 18), M(0x2a2a2a, 0.5, 0.4), 0, 0.0, -0.03, Math.PI / 2);
+    return y;
   };
   // cross-bar joining both yokes, centre column into the panel, round knob on the bar
   const CX = 0.0075, CY = YOKE_Y - 0.01, BAR_Z = YOKE_Z - 0.035;      // one axis for column, bar junction and knob
@@ -1717,7 +1718,7 @@ function makeCockpit() {
   add(new THREE.TorusGeometry(0.027, 0.004, 8, 28), M(0xc8c8c8, 0.2, 1), CX, CY, BAR_Z + 0.051);
   add(new THREE.CircleGeometry(0.024, 28), M(0x0c0c0c, 0.3, 0.4), CX, CY, BAR_Z + 0.0505);
   for (const xx of [-0.12, 0.13]) add(new THREE.CylinderGeometry(0.021, 0.021, 0.04, 14), M(0x2a2a2a, 0.9), xx, YOKE_Y - 0.01, YOKE_Z - 0.035, 0, 0, Math.PI / 2);   // rubber wrap
-  makeYoke(-0.285, true); makeYoke(0.3, false);
+  makeYoke(-0.285, true); const yokeR = makeYoke(0.3, false);
 
   // cabin shell: side walls with window openings, pillars, roof, floor
   for (const s of [-1, 1]) {
@@ -2040,7 +2041,7 @@ function makeCockpit() {
 
   hotspots.push(Object.assign(aspen, { name: 'aspen' }), Object.assign(asi, { name: 'asi' }),
                 Object.assign(alt, { name: 'alt' }), Object.assign(gtn, { name: 'gtn' }));
-  g.userData = { alt, hsi, rainPane };
+  g.userData = { alt, hsi, rainPane, gtn, yokeR };
   return g;
 }
 
@@ -2149,7 +2150,7 @@ function moveResearch() {
   });
 }
 // ======================= chapter 3: the work plan as a flight plan (two routes merging, then the runway) =======================
-const ch3 = new THREE.Group(); lead.add(ch3);
+const ch3 = new THREE.Group(); lead.add(ch3); ch3.visible = false;   // the sky version is replaced by the nav map below
 const RZ = -42;
 const WP = {
   w1: [-13, 15.5], w2: [-5, 16], w3: [3, 15.5], w4: [10, 14], h0: [-13, 4.5], w5: [-2, 5], w6: [17, 9.5], w7: [26.5, 8.2],
@@ -2218,6 +2219,142 @@ leg('w6', 'w7', GOLD, 23);
   const lbl = wpLabel('7', 'ทดสอบ · ประเมินผล', '#ffd36a'); lbl.position.set(-0.6, 4.6, 6); rw.add(lbl);
   rw.scale.setScalar(0.001); rw.visible = false; ch3.add(rw);
   ch3Items.push({ step: 23, obj: rw, kind: 'pop' });
+}
+// ======================= chapter 3 on the IFD550: the work plan drawn as a moving-map flight plan =======================
+const NAV_W = 1200, NAV_H = 940, NAV_TOP = 52;
+const NAV_WP = {            // map pixels; [x, y, label side]
+  1: [170, 250, 'up'], 2: [360, 185, 'up'], 3: [560, 255, 'up'], 4: [745, 345, 'right'],
+  h0: [150, 735], 5: [440, 655, 'down'], 6: [860, 545, 'up'], 7: [1040, 700, 'down'],
+};
+const NAV_TEXT = { 1: 'X-Plane · คัดคำสั่ง', 2: 'ทดสอบอ่าน/เขียน', 3: 'MCP Server', 4: 'Client · ReAct',
+  5: 'จอ Aspen', 6: 'เชื่อมระบบ · ความปลอดภัย', 7: 'ทดสอบ · ประเมินผล' };
+const NAV_LEGS = [           // [from, to, step, dashed (hardware lane)]
+  [1, 2, 18], [2, 3, 19], [3, 4, 20], ['h0', 5, 21, true], [4, 6, 22], [5, 6, 22, true], [6, 7, 23]];
+const NAV_STEP_WP = { 17: 1, 18: 2, 19: 3, 20: 4, 21: 5, 22: 6, 23: 7 };
+const MAGENTA = '#ff3df5', NAV_CYAN = '#6fe6ff';
+const navBase = (() => {                                   // static terrain, drawn once
+  const c = document.createElement('canvas'); c.width = NAV_W; c.height = NAV_H; const g = c.getContext('2d');
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = '#6f9d86'; g.fillRect(0, 0, NAV_W, NAV_H);
+  for (let i = 0; i < 70; i++) {                           // soft mottling of the land
+    const x = rnd() * NAV_W, y = rnd() * NAV_H, r = 40 + rnd() * 140, gr = g.createRadialGradient(x, y, 0, x, y, r);
+    const tone = rnd() > 0.5 ? '96,140,112' : '128,166,136'; gr.addColorStop(0, `rgba(${tone},.35)`); gr.addColorStop(1, `rgba(${tone},0)`);
+    g.fillStyle = gr; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+  }
+  const wobbly = (pts, amp) => { const out = []; for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+    for (let k = 0; k < 8; k++) { const t = k / 8; out.push([x0 + (x1 - x0) * t + (rnd() - 0.5) * amp, y0 + (y1 - y0) * t + (rnd() - 0.5) * amp]); } }
+    out.push(pts[pts.length - 1]); return out; };
+  const path = (pts) => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts.slice(1)) g.lineTo(...p); };
+  g.fillStyle = '#0b2f93';                                  // sea in the lower right, ragged coast
+  const coast = wobbly([[NAV_W, 470], [1080, 520], [960, 640], [930, 760], [820, 860], [760, NAV_H]], 26);
+  path([...coast, [NAV_W, NAV_H]]); g.closePath(); g.fill();
+  g.strokeStyle = '#123c9c'; g.lineWidth = 3; path(coast); g.stroke();
+  for (let i = 0; i < 14; i++) { g.beginPath(); g.arc(960 + rnd() * 240, 560 + rnd() * 380, 4 + rnd() * 18, 0, 7); g.fill(); }   // shoals
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const river = (pts, w) => { g.strokeStyle = '#0b2f93'; g.lineWidth = w; path(wobbly(pts, 22)); g.stroke(); };
+  river([[40, NAV_TOP], [140, 300], [90, 470], [260, 600], [300, NAV_H]], 5);
+  river([[620, NAV_TOP], [600, 160], [690, 300], [640, 450], [780, 600], [900, 720]], 4);
+  river([[300, 420], [430, 480], [560, 470], [650, 520]], 3);
+  for (let i = 0; i < 6; i++) { g.fillStyle = '#0b2f93'; g.beginPath(); g.ellipse(rnd() * 900, 120 + rnd() * 700, 8 + rnd() * 16, 5 + rnd() * 9, rnd() * 3, 0, 7); g.fill(); }
+  const rose = (cx, cy, r) => {                              // VOR compass roses, cut by the screen edge like the real display
+    g.strokeStyle = 'rgba(40,80,170,.9)'; g.fillStyle = 'rgba(40,80,170,.95)'; g.lineWidth = 2.5;
+    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke();
+    for (let a = 0; a < 360; a += 10) { const q = a * Math.PI / 180, l = a % 30 ? 10 : 20;
+      g.beginPath(); g.moveTo(cx + Math.sin(q) * r, cy - Math.cos(q) * r); g.lineTo(cx + Math.sin(q) * (r - l), cy - Math.cos(q) * (r - l)); g.stroke();
+      if (a % 30 === 0) { g.save(); g.translate(cx + Math.sin(q) * (r - 38), cy - Math.cos(q) * (r - 38)); g.rotate(q);
+        g.font = '600 22px Rajdhani, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(a ? String(a / 10) : 'N', 0, 0); g.restore(); } }
+    g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill();
+  };
+  rose(90, 170, 230); rose(1130, 840, 260); rose(600, 905, 150);
+  return c;
+})();
+const navCanvas = document.createElement('canvas'); navCanvas.width = NAV_W; navCanvas.height = NAV_H;
+const navTex = new THREE.CanvasTexture(navCanvas); navTex.colorSpace = THREE.SRGBColorSpace; navTex.anisotropy = 8;
+const nav = { legs: NAV_LEGS.map(() => 0), plane: null, hdg: 90, timer: 0, on: false };
+const navPt = (k) => NAV_WP[k];
+function navLabel(g, k, pulse) {
+  const [x, y, side] = navPt(k), text = NAV_TEXT[k];
+  g.font = '600 30px Prompt, sans-serif'; const tw = g.measureText(text).width;
+  const bw = tw + 76, bh = 48;
+  let bx = x - bw / 2, by = y - 30 - bh;
+  if (side === 'down') by = y + 30; else if (side === 'right') { bx = x + 28; by = y - bh / 2 - 34; }
+  g.fillStyle = 'rgba(6,10,20,.82)'; g.beginPath(); g.roundRect(bx, by, bw, bh, 8); g.fill();
+  g.strokeStyle = pulse ? MAGENTA : 'rgba(255,255,255,.55)'; g.lineWidth = pulse ? 3 : 1.5; g.stroke();
+  g.fillStyle = NAV_CYAN; g.beginPath(); g.arc(bx + 26, by + bh / 2, 15, 0, 7); g.fill();
+  g.fillStyle = '#04121c'; g.font = '700 22px Rajdhani, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(k), bx + 26, by + bh / 2 + 1);
+  g.fillStyle = '#ffffff'; g.font = '600 30px Prompt, sans-serif'; g.textAlign = 'left'; g.fillText(text, bx + 52, by + bh / 2 + 2);
+}
+function navAirport(g, x, y) {                              // airport symbol: runway inside a ring
+  g.save(); g.translate(x, y); g.rotate(-0.55);
+  g.strokeStyle = NAV_CYAN; g.lineWidth = 4; g.beginPath(); g.arc(0, 0, 24, 0, 7); g.stroke();
+  g.fillStyle = NAV_CYAN; g.fillRect(-5, -36, 10, 72); g.restore();
+}
+function navPlane(g, x, y, hdg) {
+  g.save(); g.translate(x, y); g.rotate(hdg * Math.PI / 180);
+  g.fillStyle = '#ffffff'; g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 3; g.beginPath();
+  g.moveTo(0, -26); g.lineTo(4, -10); g.lineTo(24, 2); g.lineTo(24, 7); g.lineTo(4, 2); g.lineTo(3, 16); g.lineTo(10, 22); g.lineTo(10, 26);
+  g.lineTo(-10, 26); g.lineTo(-10, 22); g.lineTo(-3, 16); g.lineTo(-4, 2); g.lineTo(-24, 7); g.lineTo(-24, 2); g.lineTo(-4, -10); g.closePath();
+  g.stroke(); g.fill(); g.restore();
+}
+function navRing(g, x, y) {                                 // range ring centred on the aircraft
+  const r = 170; g.strokeStyle = 'rgba(255,255,255,.85)'; g.fillStyle = '#fff'; g.lineWidth = 2;
+  g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke();
+  for (let a = 0; a < 360; a += 10) { const q = a * Math.PI / 180, l = a % 30 ? 7 : 14;
+    g.beginPath(); g.moveTo(x + Math.sin(q) * r, y - Math.cos(q) * r); g.lineTo(x + Math.sin(q) * (r - l), y - Math.cos(q) * (r - l)); g.stroke(); }
+  g.font = '600 24px Rajdhani, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  [['N', 0], ['E', 90], ['S', 180], ['W', 270]].forEach(([t, a]) => { const q = a * Math.PI / 180; g.fillText(t, x + Math.sin(q) * (r - 30), y - Math.cos(q) * (r - 30)); });
+}
+function drawNav(t) {
+  const g = navCanvas.getContext('2d');
+  g.drawImage(navBase, 0, 0);
+  g.lineCap = 'round';
+  NAV_LEGS.forEach(([a, b, , dashed], i) => {               // route legs, drawn out as they are revealed
+    const p = nav.legs[i]; if (p <= 0) return;
+    const [x0, y0] = navPt(a), [x1, y1] = navPt(b);
+    g.setLineDash(dashed ? [22, 16] : []);
+    g.strokeStyle = 'rgba(40,0,40,.55)'; g.lineWidth = 11; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + (x1 - x0) * p, y0 + (y1 - y0) * p); g.stroke();
+    g.strokeStyle = MAGENTA; g.lineWidth = 6; g.stroke();
+  });
+  g.setLineDash([]);
+  const cur = NAV_STEP_WP[step];
+  const shown = (k) => step >= 16 + Number(k);
+  if (step >= 21) { const [x, y] = navPt('h0'); g.fillStyle = MAGENTA; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); }
+  g.font = '700 30px Rajdhani, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle';
+  if (step >= 17) { g.fillStyle = 'rgba(6,10,20,.75)'; g.fillRect(96, 300, 160, 40); g.fillStyle = MAGENTA; g.fillText('SOFTWARE', 108, 321); }
+  if (step >= 21) { g.fillStyle = 'rgba(6,10,20,.75)'; g.fillRect(96, 770, 166, 40); g.fillStyle = MAGENTA; g.fillText('HARDWARE', 108, 791); }
+  for (const k of [1, 2, 3, 4, 5, 6, 7]) {                  // waypoint symbols
+    if (!shown(k)) continue;
+    const [x, y] = navPt(k);
+    if (k === 7) navAirport(g, x, y);
+    else { g.fillStyle = NAV_CYAN; g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 13, 0, 7); g.fill(); g.stroke(); }
+    if (k === cur) { g.strokeStyle = MAGENTA; g.lineWidth = 4; g.beginPath(); g.arc(x, y, 30 + Math.sin(t * 4) * 5, 0, 7); g.stroke(); }
+  }
+  if (nav.plane) { navRing(g, nav.plane[0], nav.plane[1]); navPlane(g, nav.plane[0], nav.plane[1], nav.hdg); }
+  for (const k of [1, 2, 3, 4, 5, 6, 7]) if (shown(k)) navLabel(g, k, k === cur);
+  g.fillStyle = '#05070a'; g.fillRect(0, 0, NAV_W, NAV_TOP);                           // top status bar
+  g.font = '600 30px Rajdhani, sans-serif'; g.textBaseline = 'middle';
+  g.fillStyle = '#7dff8c'; g.textAlign = 'left'; g.fillText('111.70', 18, 27); g.fillStyle = '#9aa3ad'; g.fillText('NAV1', 118, 27);
+  g.strokeStyle = '#d9a640'; g.lineWidth = 2; g.strokeRect(390, 7, 420, 38);
+  g.fillStyle = '#e8e8e8'; g.textAlign = 'center'; g.fillText('FPL · PROJECT PLAN', 600, 27);
+  g.fillStyle = '#58e0ff'; g.textAlign = 'right'; g.fillText('121.500', NAV_W - 110, 27); g.fillStyle = '#9aa3ad'; g.fillText('COM1', NAV_W - 18, 27);
+  g.fillStyle = 'rgba(0,0,0,.75)'; g.fillRect(NAV_W - 120, NAV_TOP + 16, 100, 38); g.fillStyle = '#fff'; g.font = '600 26px Rajdhani, sans-serif'; g.fillText('5 nm', NAV_W - 34, NAV_TOP + 36);
+  navTex.needsUpdate = true;
+}
+function animateNav(dt, t) {
+  const inCh3 = step >= 17, gtn = cockpit.userData.gtn;
+  if (inCh3 !== nav.on) { nav.on = inCh3; gtn.material.map = inCh3 ? navTex : ifdTex; gtn.material.needsUpdate = true;
+    if (!inCh3) { nav.plane = null; nav.legs.fill(0); } }
+  cockpit.userData.yokeR.visible = !(inCh3 && look.fov < 45);   // the right yoke sits between the eye and the navigator
+  if (!inCh3) return;
+  NAV_LEGS.forEach(([, , st], i) => { nav.legs[i] = step >= st ? Math.min(1, nav.legs[i] + dt * 1.3) : 0; });
+  const tgt = navPt(NAV_STEP_WP[step]);
+  if (!nav.plane) nav.plane = [tgt[0], tgt[1]];
+  const dx = tgt[0] - nav.plane[0], dy = tgt[1] - nav.plane[1], f = 1 - Math.exp(-dt * 2.2);
+  if (Math.hypot(dx, dy) > 4) {                             // fly towards the waypoint, nose along the track
+    const want = Math.atan2(dx, -dy) * 180 / Math.PI; let d = ((want - nav.hdg + 540) % 360) - 180; nav.hdg += d * Math.min(1, dt * 6);
+  }
+  nav.plane[0] += dx * f; nav.plane[1] += dy * f;
+  nav.timer += dt; if (nav.timer > 1 / 30) { nav.timer = 0; drawNav(t); }
 }
 function showChapter3() {
   const inCh3 = step >= 17;
@@ -2525,7 +2662,11 @@ function goStep(n) {
   else if (step === 14) view(-1.3, 0.0, 55, 2.2);          // right window
   else if (step === 15) view(0, 0.05, 52, 1.8);            // straight ahead
   else if (step === 16) view(0, 0.1, 62, 1.6);             // summary: all three in formation ahead
-  else view(-0.17, 0.26, 50, 1.8);                         // chapter 3: the flight plan in the sky
+  else {                                                   // chapter 3: the flight plan on the IFD550 moving map
+    look.locked = true;
+    const a = aimAt(cockpit.userData.gtn);
+    gsap.to(look, { tYaw: a.yaw, tPitch: a.pitch - 0.024, tFov: 10, duration: 1.6, ease: 'power3.inOut' });
+  }
   $('hsicard').classList.toggle('show', step === 2);
   $('ios').classList.toggle('show', step === 3);
   $('ios').classList.toggle('collapse', step >= 4);
@@ -2621,6 +2762,7 @@ function frame() {
   updateLightning(dt);
   animateChapter2(dt, t);
   animateChapter3(dt, t);
+  if (cockpit.visible) animateNav(dt, t);
   if (rain.visible) {
     for (let i = 0; i < RAIN_N; i++) {
       const o = i * 6, dz = 70 * dt, dy = -6 * dt;
