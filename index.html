@@ -3071,8 +3071,6 @@ const EQ = (() => {
     g.fillStyle = gr; g.fillRect(0, H * 0.62, 780, H * 0.38);
     for (let i = 0; i < 9; i++) { g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(60 + i * 90, 300 + (i % 3) * 30, 70, 18, 0, 0, 7); g.fill(); }
     g.fillStyle = '#5b5f66'; g.beginPath(); g.moveTo(330, H); g.lineTo(450, H); g.lineTo(395, H * 0.64); g.lineTo(385, H * 0.64); g.closePath(); g.fill();   // runway
-    g.fillStyle = '#1b1d21'; g.fillRect(0, 610, 780, 190);                                                 // glareshield + panel
-    for (let i = 0; i < 6; i++) { g.fillStyle = '#0c0d0f'; g.beginPath(); g.arc(80 + i * 125, 700, 48, 0, 7); g.fill(); g.strokeStyle = '#ddd'; g.lineWidth = 3; g.beginPath(); g.arc(80 + i * 125, 700, 40, 0, 7); g.stroke(); }
     g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, 780, 34); txt(g, 'X-Plane 12', 70, 17, 22, '#222', '700');
     g.fillStyle = '#f3f4f6'; g.fillRect(780, 0, 500, H);                                                    // chat window
     g.fillStyle = '#1f2937'; g.fillRect(780, 0, 500, 60); txt(g, 'AI Flight Assistant', 1030, 30, 26, '#fff', '700');
@@ -3089,6 +3087,11 @@ const EQ = (() => {
     txt(g, 'พิมพ์คำสั่ง...', 810, H - 50, 22, '#94a3b8', '500', 'left');
   });
   const nb1 = makeNotebook(nb1Tex);
+  // the X-Plane half of notebook 1 shows our own aircraft from a chase camera, rendered live into a texture
+  const xpRT = new THREE.WebGLRenderTarget(560, 552, { samples: 4 });
+  const xpView = new THREE.Mesh(new THREE.PlaneGeometry(0.3 * 780 / 1280, 0.188 * 766 / 800), new THREE.MeshBasicMaterial({ map: xpRT.texture, toneMapped: false }));
+  xpView.position.set(-0.15 + 0.3 * 390 / 1280, 0.116 - 0.188 * 17 / 800, 0.0034); nb1.userData.lid.add(xpView);
+  const chase = new THREE.PerspectiveCamera(42, 560 / 552, 0.1, 30000); lead.add(chase);
   // notebook 2: the Aspen screen, live (portrait picture centred on the landscape panel)
   const nb2 = makeNotebook(aspenTex, [0.125, 0.188]);
   // variant B: LCD module showing the Aspen screen, Raspberry Pi 3 Model A+ on standoffs behind it
@@ -3268,7 +3271,7 @@ const EQ = (() => {
   glow.rotation.x = -Math.PI / 2; root.add(glow);
   const spot = new THREE.SpotLight(0xfff2dd, 0, 2.2, 0.75, 0.6, 1.2); spot.position.set(0, 1.15, 0.6); root.add(spot); root.add(spot.target);
   const fill = new THREE.PointLight(0xcfe3ff, 0, 1.2, 1.5); fill.position.set(0, 0.95, 0.45); root.add(fill);
-  return { ITEMS, nb1, nb2, lcd, esp, enc, gameCase, glow, spot, fill, paintCase, coverDone: false, spin: 0, k: 0 };
+  return { ITEMS, nb1, nb2, lcd, esp, enc, gameCase, glow, spot, fill, paintCase, coverDone: false, spin: 0, k: 0, xpRT, chase, xpTimer: 0 };
 })();
 const EQ_LIFT = new V3(0, 0.74, 0.82);                    // where a picked item floats, facing the camera
 const EQ_TEXT = {
@@ -3294,6 +3297,15 @@ function eqCard() {
   $('eq-var').textContent = eqVariant === 'A' ? 'แบบ A · โน้ตบุ๊ก  —  กด H เพื่อสลับ' : 'แบบ B · Raspberry Pi  —  กด H เพื่อสลับ';
 }
 function setEqVariant(v) { eqVariant = v; if (step >= stepCount()) goStep(stepCount() - 1); eqCard(); }
+function renderChaseView(t) {                              // X-Plane style external view of the aircraft we are sitting in
+  const ext = lead.userData.exteriorOnly, propMat = lead.userData.prop.children[0].material, op = propMat.opacity;
+  const a = Math.sin(t * 0.12) * 0.35;                       // slow drift around the tail, like a hand-held chase view
+  EQ.chase.position.set(Math.sin(a) * 11 + 2.2, 2.0 + Math.sin(t * 0.2) * 0.3, Math.cos(a) * 11);
+  EQ.chase.lookAt(lead.localToWorld(new V3(0, 0.3, -1.5)));
+  ext.forEach((o) => (o.visible = true)); cockpit.visible = false; propMat.opacity = 0.8;
+  renderer.setRenderTarget(EQ.xpRT); renderer.render(scene, EQ.chase); renderer.setRenderTarget(null);
+  ext.forEach((o) => (o.visible = false)); cockpit.visible = true; propMat.opacity = op;
+}
 function animateEquip(dt, t) {
   if (!EQ.coverDone) {                                      // draw the cover once the logo image has decoded
     EQ.coverDone = true; const img = new Image(); img.onload = () => EQ.paintCase(img); img.src = XPLANE_LOGO;
@@ -3322,6 +3334,7 @@ function animateEquip(dt, t) {
     if (o === EQ.gameCase) ud.front.rotation.y = -1.15 * e;                                    // cover half open: art and disc both in view
     if (o === EQ.enc) ud.knob.rotation.y = Math.sin(t * 0.8) * 1.2 * e;
   });
+  if ((EQ.nb1.userData.p ?? 0) > 0.05) { EQ.xpTimer += dt; if (EQ.xpTimer > 1 / 24) { EQ.xpTimer = 0; renderChaseView(t); } }   // only while notebook 1 is up
   EQ.glow.position.set(liftW.x, liftW.y - 0.17, liftW.z);
   EQ.glow.material.opacity = (pick >= 0 ? 0.55 + Math.sin(t * 3) * 0.1 : 0) * EQ.k;
   EQ.spot.target.position.copy(pick >= 0 ? liftW : new V3(0, 0.2, 0.85));
