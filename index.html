@@ -54,11 +54,12 @@
   #intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: end center; padding-bottom: 7vh;
     pointer-events: none; opacity: 0; transition: opacity 1.3s ease; }
   #intro.show { opacity: 1; }
-  #intro .card { pointer-events: auto; padding: 26px 44px 30px; text-align: center; max-width: min(640px, 92vw); }
+  #intro .card { pointer-events: auto; padding: 26px 44px 30px; text-align: center; max-width: min(820px, 92vw); }
   #intro .kicker { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 13px;
     letter-spacing: .5em; color: var(--gold); margin-bottom: 14px; }
   #intro h1 { font-weight: 600; font-size: clamp(24px, 3.3vw, 40px); line-height: 1.25;
     text-shadow: 0 2px 18px rgba(10, 30, 90, .45); }
+  #intro h1 span { display: inline-block; }   /* only break between the two halves, never mid-phrase */
   #intro .sub { margin-top: 12px; font-family: 'Rajdhani', sans-serif; font-weight: 500;
     font-size: 16px; letter-spacing: .12em; color: rgba(255,255,255,.9); }
   #go { margin-top: 22px; padding: 14px 34px; border-radius: 999px; cursor: pointer; color: #fff;
@@ -227,7 +228,7 @@
 <div id="intro">
   <div class="card glass">
     <div class="kicker">WELCOME ABOARD</div>
-    <h1>ระบบควบคุมสำหรับการจำลองการบิน</h1>
+    <h1><span>ระบบควบคุม</span><span>สำหรับการจำลองการบิน</span></h1>
     <div class="sub">Aspen EFD1000 · X-Plane 12 · Model Context Protocol</div>
     <button id="go" class="glass">CLICK TO EXPLORE</button>
   </div>
