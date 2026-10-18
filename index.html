@@ -176,6 +176,13 @@
   #th.show { opacity: 1; transform: translate(-50%, 0); }
   #th.side { left: auto; right: 3vw; bottom: auto; top: 50%; width: min(400px, 32vw); transform: translate(40px, -50%); }   /* chapter 3: beside the navigator */
   #th.side.show { transform: translate(0, -50%); }
+  #eq { position: fixed; left: 50%; bottom: 5vh; z-index: 17; width: min(620px, 90vw); padding: 18px 24px; transform: translate(-50%, 40px); opacity: 0;
+    pointer-events: none; transition: opacity .5s ease, transform .6s cubic-bezier(.2,.9,.25,1.08); background: linear-gradient(140deg, rgba(30,40,80,.62), rgba(10,14,36,.74)); }
+  #eq.show { opacity: 1; transform: translate(-50%, 0); }
+  #eq .tag { font-family: 'Rajdhani', sans-serif; font-size: 12px; letter-spacing: .4em; color: var(--gold); }
+  #eq h2 { font-size: 24px; font-weight: 600; margin: 4px 0 6px; }
+  #eq p { font-size: 16px; line-height: 1.65; font-weight: 300; }
+  #eq .var { margin-top: 8px; font-family: 'Rajdhani', 'Prompt', sans-serif; font-size: 13px; letter-spacing: .06em; opacity: .7; }
   #th .tag, #paper .tag, #compare .tag { font-family: 'Rajdhani', sans-serif; font-size: 12px; letter-spacing: .4em; color: var(--gold); }
   #th h2 { font-size: 24px; font-weight: 600; margin: 4px 0 6px; display: flex; align-items: center; gap: 12px; }
   #th h2 .logo { height: 1.5em; width: auto; }
@@ -287,6 +294,7 @@
   <div class="tag">MANUFACTURER</div><h3>ผู้ผลิตได้อะไร</h3>
   <ul><li><svg viewBox="0 0 24 24"><path d="M4 4h7a3 3 0 013 3v13a2 2 0 00-2-2H4z"/><path d="M20 4h-4a3 3 0 00-2 1"/><path d="M20 4v14h-6"/></svg><div><b>ลดภาระการอบรมการใช้งานระบบ</b></div></li><li><svg viewBox="0 0 24 24"><path d="M5 21L9 3M19 21L15 3M12 5v2M12 11v2M12 17v2"/></svg><div><b>ลดการเดินทางไปแก้ปัญหานอกสถานที่โดยไม่จำเป็น</b><span>ลูกค้าแก้ปัญหาง่ายๆ ได้เอง</span></div></li><li><svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 22V12M21 7l-9 5-9-5"/></svg><div><b>ต้นแบบของระบบจำลองการบินที่ใช้งานง่าย</b></div></li></ul>
 </div>
+<div id="eq" class="glass" aria-hidden="true"><div class="tag" id="eq-tag"></div><h2 id="eq-title"></h2><p id="eq-body"></p><div class="var" id="eq-var"></div></div>
 <div id="th" class="glass" aria-hidden="true"><div class="tag" id="th-tag"></div><h2 id="th-title"></h2><p id="th-body"></p></div>
 <div id="paper" class="glass" aria-hidden="true">
   <div class="tag">RELATED WORK</div><h2 id="pp-name"></h2><div class="by" id="pp-by"></div>
@@ -2497,7 +2505,7 @@ function flyTo(pos, hdgKey, tgt, dt) {                     // ease a map aircraf
   pos[0] += dx * f; pos[1] += dy * f;
 }
 function animateNav(dt, t) {
-  const inCh3 = step >= 17, gtn = cockpit.userData.gtn;
+  const inCh3 = step >= 17 && step <= 23, gtn = cockpit.userData.gtn;
   if (inCh3 !== nav.on) { nav.on = inCh3; gtn.material.map = inCh3 ? navTex : ifdTex; gtn.material.needsUpdate = true;
     if (!inCh3) { nav.sw = nav.hw = null; nav.legs.fill(0); } }
   cockpit.userData.yokeR.visible = !(inCh3 && look.fov < 45);   // the right yoke sits between the eye and the navigator
@@ -2514,7 +2522,7 @@ function animateNav(dt, t) {
   nav.timer += dt; if (nav.timer > 1 / 30) { nav.timer = 0; drawNav(t); }
 }
 function showChapter3() {
-  const inCh3 = step >= 17;
+  const inCh3 = step >= 17 && step <= 23;
   for (const it of ch3Items) {
     const on = inCh3 && step >= it.step, o = it.obj;
     if (it.kind === 'pop') {
@@ -2560,7 +2568,8 @@ function showChapter2() {
   const wait = thHold - performance.now();
   if (th && wait > 0) { $('th').classList.remove('show'); thTimer = setTimeout(() => { if (THEORY[step]) $('th').classList.add('show'); }, wait); }
   else $('th').classList.toggle('show', !!th);
-  $('th').classList.toggle('side', step >= 17);
+  $('th').classList.toggle('side', step >= 17 && step <= 23);
+  eqCard();
   if (th) { $('th-tag').textContent = th[0]; const lg = typeof th[3] === 'string' ? { src: th[3] } : th[3];                  // logo: before the title, or after it in place of the name
     const img = lg ? `<img class="logo${lg.after ? ' word' : ''}${th[1] ? '' : ' solo'}" src="${lg.src}" alt="${lg.alt || ''}">` : '';
     $('th-title').innerHTML = lg && lg.after ? th[1] + img : img + th[1]; $('th-body').innerHTML = th[2]; }
@@ -2750,7 +2759,7 @@ addEventListener('mousemove', (e) => {
 // 3 = the hard-to-use instructor-station card · 4 = it collapses into one text box (camera pulls back)
 // 5 = second command clears the weather · 6 = customer benefits · 7 = manufacturer benefits
 let step = 0;
-const STEP_COUNT = 24;
+const STEP_COUNT = 30;
 // chapter 3 · 17-23 = work-plan steps 1-7
 // chapter 2 · 8 LLM · 9 MCP · 10 ReAct · 11 X-Plane · 12 device control · 13-15 one research aircraft each · 16 summary
 // MCP mark from the official repo (modelcontextprotocol/modelcontextprotocol docs/logo/dark.svg), cropped to the icon
@@ -2810,7 +2819,8 @@ function goStep(n) {
   thHold = step < 17 && n >= 17 ? performance.now() + 1700 : 0;   // entering chapter 3: zoom onto the navigator first, card after
   step = n;
   $('info').classList.remove('show'); $('hint').classList.remove('show');
-  gsap.killTweensOf(look);
+  gsap.killTweensOf(look); gsap.killTweensOf(eyeOffT);
+  if (n < EQ_FIRST) gsap.to(eyeOffT, { x: 0, y: 0, z: 0, duration: 1.4, ease: 'power2.inOut' });
   const view = (yaw, pitch, fov, dur = 1.4) => { look.locked = true; gsap.to(look, { tYaw: yaw, tPitch: pitch, tFov: fov, duration: dur, ease: 'power2.inOut' }); };
   if (step === 0) {
     gsap.to(look, { tFov: 66, tPitch: -0.2, tYaw: 0, duration: 1.1, ease: 'power2.inOut', onComplete: () => (look.locked = false) });
@@ -2825,6 +2835,12 @@ function goStep(n) {
   else if (step === 14) view(-1.3, 0.0, 55, 2.2);          // right window
   else if (step === 15) view(0, 0.05, 52, 1.8);            // straight ahead
   else if (step === 16) view(0, 0.1, 62, 1.6);             // summary: all three in formation ahead
+  else if (step >= EQ_FIRST) {                              // equipment: lean between the front seats and look back at the rear bench
+    look.locked = true;
+    gsap.to(eyeOffT, { x: 0.27, y: 0.13, z: 0.6, duration: 1.8, ease: 'power2.inOut' });
+    gsap.to(look, step === EQ_FIRST ? { tYaw: Math.PI, tPitch: -1.02, tFov: 62, duration: 1.8, ease: 'power2.inOut' }
+                                    : { tYaw: Math.PI, tPitch: -0.36, tFov: 46, duration: 1.2, ease: 'power2.inOut' });
+  }
   else {                                                   // chapter 3: the flight plan on the IFD550 moving map
     look.locked = true;
     const a = aimAt(cockpit.userData.gtn);
@@ -2894,6 +2910,7 @@ addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') { unfocus(); goStep(0); }
   if (e.key === 'e' || e.key === 'E') setFx(!fxOn);
+  if (e.key === 'h' || e.key === 'H') setEqVariant(eqVariant === 'A' ? 'B' : 'A');   // equipment: notebook or LCD + Raspberry Pi
   if (e.key === 'r' || e.key === 'R') location.reload();
 });
 
@@ -2908,6 +2925,7 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 const SPEED = 55;                 // m/s the world streams past
 const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const eyeOff = new V3(), eyeOffT = new V3();          // the eye leans out of the seat for the equipment steps
 let aspenTimer = 0, altTimer = 0, fpsFrames = 0, fpsTime = 0;
 
 function frame() {
@@ -2925,7 +2943,7 @@ function frame() {
   updateLightning(dt);
   animateChapter2(dt, t);
   animateChapter3(dt, t);
-  if (cockpit.visible) animateNav(dt, t);
+  if (cockpit.visible) { animateNav(dt, t); animateEquip(dt, t); }
   if (rain.visible) {
     for (let i = 0; i < RAIN_N; i++) {
       const o = i * 6, dz = 70 * dt, dy = -6 * dt;
@@ -2970,13 +2988,14 @@ function frame() {
     const rock = step > 0 ? 1 : 0;
     euler.set(look.pitch, look.yaw, -sway.x * 0.05 * rock);
     camera.quaternion.setFromEuler(euler);
-    camera.position.copy(EYE);
+    eyeOff.lerp(eyeOffT, 0.08);
+    camera.position.copy(EYE).add(eyeOff);
     if (rock) {                                            // parallel shift of the eye: the view rocks but keeps pointing at the target
       camera.position.addScaledVector(new V3(1, 0, 0).applyQuaternion(camera.quaternion), sway.x * 0.012);
       camera.position.addScaledVector(new V3(0, 1, 0).applyQuaternion(camera.quaternion), sway.y * 0.008);
       $('ios').style.translate = `${-sway.x * 14}px ${sway.y * 8}px`;
       $('hsicard').style.translate = `${-sway.x * 12}px ${sway.y * 7}px`;
-      for (const id of ['chat', 'benL', 'benR', 'th', 'paper', 'compare']) $(id).style.translate = `${-sway.x * 12}px ${sway.y * 7}px`;
+      for (const id of ['chat', 'benL', 'benR', 'th', 'paper', 'compare', 'eq']) $(id).style.translate = `${-sway.x * 12}px ${sway.y * 7}px`;
     }
     if (Math.abs(camera.fov - look.fov) > 0.01) { camera.fov = look.fov; camera.updateProjectionMatrix(); }
     for (const s of shafts) s.children[0].material.opacity = 0.045 + Math.sin(t * 0.8 + s.userData.phase) * 0.015;
@@ -3011,6 +3030,242 @@ function frame() {
 
   if (fxOn) composer.render(); else renderer.render(scene, camera);
   requestAnimationFrame(frame);
+}
+
+// ======================= equipment on the rear bench: lifted one at a time, like picking an item in a game =======================
+const EQ_FIRST = 24;                                        // overview step; items follow at 25..29
+let eqVariant = 'A';                                        // A: second notebook runs the Aspen screen, B: LCD + Raspberry Pi 3 Model A+
+const EQ = (() => {
+  const root = new THREE.Group(); cockpit.add(root);
+  const Ms = (c, r = 0.5, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+  const box = (w, h, d, mat, x = 0, y = 0, z = 0, parent) => { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.18), mat); m.position.set(x, y, z); parent.add(m); return m; };
+  const plane = (w, h, mat, x, y, z, parent, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.x = rx; parent.add(m); return m; };
+  const screenMat = (tex) => new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+
+  // ---- notebook: base with keyboard, lid that opens when the item is picked ----
+  const kbTex = canvasTex(1024, 640, (g, W, H) => {
+    g.fillStyle = '#23262b'; g.fillRect(0, 0, W, H);
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 14; c++) {
+      const kw = (W - 120) / 14, kh = 52, x = 60 + c * kw, y = 40 + r * 62;
+      g.fillStyle = '#121417'; g.beginPath(); g.roundRect(x + 3, y, kw - 6, kh, 8); g.fill();
+    }
+    g.fillStyle = '#121417'; g.beginPath(); g.roundRect(300, 40 + 5 * 62, 420, 52, 8); g.fill();          // space bar row
+    g.fillStyle = '#2c3036'; g.beginPath(); g.roundRect(352, 440, 320, 170, 14); g.fill();                  // touchpad
+  });
+  const makeNotebook = (screenTex, fit) => {
+    const nb = new THREE.Group(), alu = Ms(0x3a3d42, 0.38, 0.65);
+    box(0.34, 0.018, 0.235, alu, 0, 0.009, 0, nb);
+    plane(0.33, 0.206, new THREE.MeshStandardMaterial({ map: kbTex, roughness: 0.7 }), 0, 0.0185, 0, nb, -Math.PI / 2);
+    const lid = new THREE.Group(); lid.position.set(0, 0.018, -0.115); lid.rotation.x = Math.PI / 2; nb.add(lid);   // hinge along the back edge, starts closed
+    box(0.34, 0.225, 0.008, alu, 0, 0.1125, -0.002, lid);
+    plane(0.322, 0.2, Ms(0x050505, 0.3), 0, 0.114, 0.0025, lid);                          // black glass
+    const scr = plane(fit ? fit[0] : 0.3, fit ? fit[1] : 0.188, screenMat(screenTex), 0, 0.116, 0.003, lid);
+    nb.userData = { lid, scr, closed: Math.PI / 2, open: -0.26 };
+    return nb;
+  };
+  // notebook 1: X-Plane on the left, a chat with the AI on the right
+  const nb1Tex = canvasTex(1280, 800, (g, W, H) => {
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.62); sky.addColorStop(0, '#2f6fd0'); sky.addColorStop(1, '#bcd8f2');
+    g.fillStyle = sky; g.fillRect(0, 0, 780, H * 0.62);
+    const gr = g.createLinearGradient(0, H * 0.62, 0, H); gr.addColorStop(0, '#7f9a63'); gr.addColorStop(1, '#46603a');
+    g.fillStyle = gr; g.fillRect(0, H * 0.62, 780, H * 0.38);
+    for (let i = 0; i < 9; i++) { g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.ellipse(60 + i * 90, 300 + (i % 3) * 30, 70, 18, 0, 0, 7); g.fill(); }
+    g.fillStyle = '#5b5f66'; g.beginPath(); g.moveTo(330, H); g.lineTo(450, H); g.lineTo(395, H * 0.64); g.lineTo(385, H * 0.64); g.closePath(); g.fill();   // runway
+    g.fillStyle = '#1b1d21'; g.fillRect(0, 610, 780, 190);                                                 // glareshield + panel
+    for (let i = 0; i < 6; i++) { g.fillStyle = '#0c0d0f'; g.beginPath(); g.arc(80 + i * 125, 700, 48, 0, 7); g.fill(); g.strokeStyle = '#ddd'; g.lineWidth = 3; g.beginPath(); g.arc(80 + i * 125, 700, 40, 0, 7); g.stroke(); }
+    g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, 780, 34); txt(g, 'X-Plane 12', 70, 17, 22, '#222', '700');
+    g.fillStyle = '#f3f4f6'; g.fillRect(780, 0, 500, H);                                                    // chat window
+    g.fillStyle = '#1f2937'; g.fillRect(780, 0, 500, 60); txt(g, 'AI Flight Assistant', 1030, 30, 26, '#fff', '700');
+    const bubble = (y, text, me) => { g.font = '500 24px Prompt, sans-serif'; const lines = []; let cur = '';
+      for (const ch of [...text]) { if (g.measureText(cur + ch).width > 380) { lines.push(cur); cur = ''; } cur += ch; } lines.push(cur);
+      const h = lines.length * 34 + 22, x = me ? 1260 - 410 : 800;
+      g.fillStyle = me ? '#2563eb' : '#e5e7eb'; g.beginPath(); g.roundRect(x, y, 410, h, 16); g.fill();
+      lines.forEach((l, i) => txt(g, l, x + 16, y + 28 + i * 34, 24, me ? '#fff' : '#111', '500', 'left')); return y + h + 18; };
+    let y = 90;
+    y = bubble(y, 'ขอฝนตกหนัก ทัศนวิสัยต่ำ แล้วให้ระบบสุญญากาศเสีย', true);
+    y = bubble(y, 'ตั้งฝนตกหนัก ลดทัศนวิสัย และจำลองระบบสุญญากาศเสียเรียบร้อยครับ', false);
+    y = bubble(y, 'ขอให้อากาศกลับมาปลอดโปร่ง และซ่อมระบบสุญญากาศ', true);
+    g.fillStyle = '#fff'; g.fillRect(790, H - 80, 480, 60); g.strokeStyle = '#cbd5e1'; g.lineWidth = 2; g.strokeRect(790, H - 80, 480, 60);
+    txt(g, 'พิมพ์คำสั่ง...', 810, H - 50, 22, '#94a3b8', '500', 'left');
+  });
+  const nb1 = makeNotebook(nb1Tex);
+  // notebook 2: the Aspen screen, live (portrait picture centred on the landscape panel)
+  const nb2 = makeNotebook(aspenTex, [0.125, 0.188]);
+  // variant B: LCD module showing the Aspen screen, Raspberry Pi 3 Model A+ on standoffs behind it
+  const lcd = (() => {
+    const g = new THREE.Group();
+    box(0.118, 0.17, 0.008, Ms(0x0b0b0c, 0.4), 0, 0.085, 0, g);                            // panel + bezel
+    plane(0.104, 0.156, screenMat(aspenTex), 0, 0.085, 0.0042, g);
+    box(0.112, 0.162, 0.003, Ms(0x8a8f96, 0.45, 0.6), 0, 0.085, -0.0055, g);               // metal back plate
+    const pi = new THREE.Group(); pi.position.set(0, 0.085, -0.016); pi.rotation.z = Math.PI / 2; g.add(pi);
+    const piTex = canvasTex(650, 560, (c, W, H) => { c.fillStyle = '#1f7a3a'; c.fillRect(0, 0, W, H);
+      c.strokeStyle = 'rgba(210,190,120,.6)'; c.lineWidth = 3; for (let i = 0; i < 18; i++) { c.beginPath(); c.moveTo(Math.random() * W, Math.random() * H); c.lineTo(Math.random() * W, Math.random() * H); c.stroke(); }
+      c.fillStyle = '#e8e8e8'; c.font = '600 22px Rajdhani, sans-serif'; c.fillText('Raspberry Pi 3 Model A+', 40, H - 30);
+      for (let i = 0; i < 20; i++) for (let r = 0; r < 2; r++) { c.fillStyle = '#d9b14a'; c.beginPath(); c.arc(80 + i * 26, 30 + r * 26, 6, 0, 7); c.fill(); } });
+    box(0.065, 0.056, 0.0016, new THREE.MeshStandardMaterial({ map: piTex, roughness: 0.6 }), 0, 0, 0, pi);
+    box(0.014, 0.014, 0.0015, Ms(0x222222, 0.4, 0.3), -0.005, 0.002, -0.0016, pi);         // SoC (under the metal-look cap)
+    box(0.012, 0.012, 0.001, Ms(0xc8c8c8, 0.3, 0.9), -0.005, 0.002, -0.003, pi);
+    box(0.015, 0.014, 0.007, Ms(0xb9bcc2, 0.3, 0.9), 0.03, -0.012, -0.004, pi);            // USB-A
+    box(0.015, 0.006, 0.006, Ms(0x9aa0a6, 0.3, 0.9), 0.0, -0.028, -0.003, pi);             // HDMI
+    box(0.051, 0.005, 0.0085, Ms(0x111111, 0.6), -0.003, 0.024, -0.005, pi);               // 40-pin header
+    for (const [sx, sy] of [[-0.029, -0.024], [0.029, -0.024], [-0.029, 0.024], [0.029, 0.024]]) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.0025, 0.012, 10), Ms(0xc9b26b, 0.4, 0.8)); s.rotation.x = Math.PI / 2; s.position.set(sx, sy, 0.006); pi.add(s); }
+    const cable = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new V3(0.028, -0.03, -0.005), new V3(0.05, -0.06, -0.01), new V3(0.04, -0.075, 0)]), 16, 0.003, 8), Ms(0x111111, 0.6));
+    pi.add(cable);
+    return g;
+  })();
+  // ESP32-C3 SuperMini: 22.5 x 18 mm board, USB-C at one end, chip antenna at the other
+  const esp = (() => {
+    const g = new THREE.Group();
+    const pcbTex = canvasTex(450, 360, (c, W, H) => { c.fillStyle = '#18191c'; c.fillRect(0, 0, W, H);
+      for (let i = 0; i < 8; i++) for (const y of [16, H - 16]) { c.fillStyle = '#d6b45a'; c.beginPath(); c.arc(40 + i * 52, y, 12, 0, 7); c.fill(); c.fillStyle = '#18191c'; c.beginPath(); c.arc(40 + i * 52, y, 5, 0, 7); c.fill(); }
+      c.fillStyle = '#e9e9e9'; c.font = '600 22px Rajdhani, sans-serif'; c.fillText('ESP32-C3', 250, 110); c.fillText('SuperMini', 250, 140);
+      c.font = '600 18px Rajdhani, sans-serif'; ['5V', 'G', '3V3', '4', '3', '2', '1', '0'].forEach((t, i) => c.fillText(t, 30 + i * 52, 60)); });
+    box(0.0225, 0.0016, 0.018, new THREE.MeshStandardMaterial({ map: pcbTex, roughness: 0.55 }), 0, 0.0008, 0, g).material.map.rotation = 0;
+    box(0.005, 0.0009, 0.005, Ms(0x1a1a1a, 0.35, 0.2), -0.002, 0.002, 0.0, g);              // ESP32-C3 QFN
+    box(0.0089, 0.0032, 0.0074, Ms(0xc4c7cc, 0.25, 0.95), -0.0105, 0.0024, 0, g);          // USB-C receptacle
+    box(0.0032, 0.0012, 0.0016, Ms(0xe4e1d6, 0.4), 0.0095, 0.0018, 0.004, g);              // ceramic chip antenna
+    for (const [x, z] of [[-0.004, -0.0065], [0.0005, -0.0065]]) box(0.0025, 0.0012, 0.0018, Ms(0xdddddd, 0.4, 0.3), x, 0.0021, z, g);   // BOOT / RST
+    const led = box(0.0012, 0.0006, 0.0008, new THREE.MeshStandardMaterial({ color: 0xff3030, emissive: 0xff2020, emissiveIntensity: 2 }), 0.004, 0.0019, -0.006, g);
+    for (let i = 0; i < 8; i++) for (const z of [-0.0078, 0.0078]) {                       // header pins underneath
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.0006, 0.0065, 0.0006), Ms(0xd8b55c, 0.3, 0.9)); p.position.set(-0.0091 + i * 0.0026, -0.0035, z); g.add(p);
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.0024, 0.0024, 0.0024), Ms(0x111111, 0.7)); s.position.set(-0.0091 + i * 0.0026, -0.0013, z); g.add(s);
+    }
+    g.userData.led = led; return g;
+  })();
+  // rotary encoder (EC11) with an aluminium knob, plus a push button, on a small perfboard
+  const enc = (() => {
+    const g = new THREE.Group();
+    const pbTex = canvasTex(500, 350, (c, W, H) => { c.fillStyle = '#c99a4a'; c.fillRect(0, 0, W, H);
+      for (let x = 12; x < W; x += 25) for (let y = 12; y < H; y += 25) { c.fillStyle = '#e8c27a'; c.beginPath(); c.arc(x, y, 7, 0, 7); c.fill(); c.fillStyle = '#5a3d17'; c.beginPath(); c.arc(x, y, 3, 0, 7); c.fill(); } });
+    box(0.05, 0.0016, 0.035, new THREE.MeshStandardMaterial({ map: pbTex, roughness: 0.7 }), 0, 0.0008, 0, g);
+    box(0.0124, 0.0065, 0.0134, Ms(0xb8bcc2, 0.3, 0.9), -0.011, 0.0049, 0, g);           // EC11 metal body
+    box(0.012, 0.002, 0.013, Ms(0x1b1b1b, 0.6), -0.011, 0.0025, 0, g);
+    const bush = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.005, 20), Ms(0xc9ccd1, 0.3, 0.9)); bush.position.set(-0.011, 0.0106, 0); g.add(bush);
+    const knob = new THREE.Group(); knob.position.set(-0.011, 0.0135, 0); g.add(knob);
+    const kgeo = new THREE.CylinderGeometry(0.0075, 0.008, 0.011, 40, 1); const kp = kgeo.attributes.position;
+    for (let i = 0; i < kp.count; i++) { const x = kp.getX(i), z = kp.getZ(i), r = Math.hypot(x, z); if (r < 0.0072) continue; const k = 1 + 0.05 * Math.cos(Math.atan2(z, x) * 20); kp.setX(i, x * k); kp.setZ(i, z * k); }
+    kgeo.computeVertexNormals();
+    const kn = new THREE.Mesh(kgeo, Ms(0x9aa0a8, 0.28, 1)); kn.position.y = 0.0055; knob.add(kn);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0068, 0.0068, 0.0006, 32), Ms(0x2a2c30, 0.3, 0.6)); cap.position.y = 0.0112; knob.add(cap);
+    const mark = new THREE.Mesh(new THREE.BoxGeometry(0.0009, 0.0007, 0.005), Ms(0xffffff, 0.4)); mark.position.set(0, 0.0115, -0.003); knob.add(mark);
+    for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.0008, 0.004, 0.0004), Ms(0xd8b55c, 0.3, 0.9)); p.position.set(-0.016 + i * 0.0025, -0.0015, -0.0075); g.add(p); }
+    box(0.012, 0.0035, 0.012, Ms(0x1a1a1a, 0.5), 0.013, 0.0026, 0, g);                    // 12 mm tactile switch
+    for (const [x, z] of [[0.0085, -0.0045], [0.0175, -0.0045], [0.0085, 0.0045], [0.0175, 0.0045]]) { const s = new THREE.Mesh(new THREE.CylinderGeometry(0.0009, 0.0009, 0.0006, 10), Ms(0xcfd2d6, 0.3, 0.9)); s.position.set(x, 0.0047, z); g.add(s); }
+    const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.0034, 0.0036, 0.004, 24), Ms(0x2f6fd0, 0.45)); btn.position.set(0.013, 0.0063, 0); g.add(btn);
+    g.userData.knob = knob; return g;
+  })();
+  // X-Plane 12 game case, half open, disc on its hub
+  const coverCanvas = document.createElement('canvas'); coverCanvas.width = 540; coverCanvas.height = 760;
+  const coverTex = new THREE.CanvasTexture(coverCanvas); coverTex.colorSpace = THREE.SRGBColorSpace; coverTex.anisotropy = 8;
+  const discCanvas = document.createElement('canvas'); discCanvas.width = discCanvas.height = 512;
+  const discTex = new THREE.CanvasTexture(discCanvas); discTex.colorSpace = THREE.SRGBColorSpace;
+  const paintCase = (logo) => {
+    const g = coverCanvas.getContext('2d'), W = 540, H = 760;
+    const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#0d3f86'); sky.addColorStop(0.55, '#5aa7e6'); sky.addColorStop(0.75, '#f3c27a'); sky.addColorStop(1, '#2b2b36');
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(255,255,255,${0.25 + (i % 3) * 0.12})`; g.beginPath(); g.ellipse((i * 97) % W, 420 + (i % 4) * 40, 120, 26, 0, 0, 7); g.fill(); }
+    g.save(); g.translate(300, 330); g.rotate(-0.18); g.fillStyle = '#f4f4f4';                         // aircraft silhouette
+    g.beginPath(); g.ellipse(0, 0, 150, 20, 0, 0, 7); g.fill(); g.beginPath(); g.moveTo(-30, 0); g.lineTo(40, 0); g.lineTo(-10, 120); g.lineTo(-60, 120); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-30, 0); g.lineTo(40, 0); g.lineTo(-10, -100); g.lineTo(-50, -100); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-140, 0); g.lineTo(-110, 0); g.lineTo(-150, -55); g.closePath(); g.fill(); g.restore();
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, W, 150);
+    if (logo) g.drawImage(logo, 30, 40, W - 60, (W - 60) * 182 / 1060);
+    txt(g, 'FLIGHT SIMULATOR', W / 2, 135, 26, '#e8eef6', '700');
+    g.fillStyle = '#111'; g.fillRect(0, H - 60, W, 60); txt(g, 'PC · MAC · LINUX', W / 2, H - 30, 22, '#ddd', '700');
+    coverTex.needsUpdate = true;
+    const d = discCanvas.getContext('2d'); d.clearRect(0, 0, 512, 512);
+    const dg = d.createRadialGradient(256, 256, 40, 256, 256, 256); dg.addColorStop(0, '#dfe6ee'); dg.addColorStop(0.5, '#9fb6cc'); dg.addColorStop(1, '#e9eef4');
+    d.fillStyle = dg; d.beginPath(); d.arc(256, 256, 254, 0, 7); d.fill();
+    d.fillStyle = '#0d3f86'; d.beginPath(); d.arc(256, 256, 200, Math.PI * 1.05, Math.PI * 1.95); d.arc(256, 256, 70, Math.PI * 1.95, Math.PI * 1.05, true); d.fill();
+    if (logo) d.drawImage(logo, 120, 120, 272, 272 * 182 / 1060);
+    d.globalCompositeOperation = 'destination-out'; d.beginPath(); d.arc(256, 256, 26, 0, 7); d.fill(); d.globalCompositeOperation = 'source-over';
+    d.strokeStyle = 'rgba(255,255,255,.6)'; d.lineWidth = 3; d.beginPath(); d.arc(256, 256, 60, 0, 7); d.stroke();
+    discTex.needsUpdate = true;
+  };
+  paintCase(null);
+  const gameCase = (() => {
+    const g = new THREE.Group(), shell = Ms(0x0d0d0f, 0.35, 0.1), W = 0.135, H = 0.19, T = 0.007;
+    const back = new THREE.Group(); g.add(back);                                              // tray with the disc
+    box(W, H, T, shell, 0, H / 2, 0, back);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.004, 24), Ms(0x1d1d20, 0.4)); hub.rotation.x = Math.PI / 2; hub.position.set(0, H / 2, T / 2 + 0.001); back.add(hub);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.06, 64), new THREE.MeshPhysicalMaterial({ map: discTex, transparent: true, roughness: 0.15, metalness: 0.7, clearcoat: 1, iridescence: 0.6 }));
+    disc.position.set(0, H / 2, T / 2 + 0.0015); back.add(disc);
+    const front = new THREE.Group(); front.position.set(-W / 2, 0, 0); g.add(front);            // cover hinged on the left edge
+    box(W, H, T, shell, W / 2, H / 2, 0, front);
+    plane(W - 0.006, H - 0.006, new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.35 }), W / 2, H / 2, T / 2 + 0.0006, front);
+    plane(W - 0.004, H - 0.004, new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.05, clearcoat: 1 }), W / 2, H / 2, T / 2 + 0.0012, front);
+    front.position.z = T;
+    g.userData = { front, disc };
+    return g;
+  })();
+  const ITEMS = [   // rest pose on the bench, scale and lift height when picked
+    { key: 'nb1', obj: nb1, rest: [-0.27, 0.205, 0.96, 0, 0.12], big: 1.0 },          // above the lap belts
+    { key: 'dev2', obj: null, rest: [0.27, 0.205, 0.96, 0, -0.1], big: 1.0 },
+    { key: 'esp', obj: esp, rest: [-0.13, 0.17, 0.74, 0, 0.6], big: 9 },
+    { key: 'enc', obj: enc, rest: [-0.38, 0.17, 0.74, 0, -0.3], big: 4.4 },
+    { key: 'xp', obj: gameCase, rest: [0.27, 0.175, 0.74, -Math.PI / 2, 0.25], big: 1.15 },
+  ];
+  for (const o of [nb1, nb2, lcd, esp, enc, gameCase]) root.add(o);
+  lcd.userData.restTilt = -Math.PI / 2;
+  const glow = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.16, 64), new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0, side: THREE.DoubleSide, toneMapped: false, depthWrite: false }));
+  glow.rotation.x = -Math.PI / 2; root.add(glow);
+  const spot = new THREE.SpotLight(0xfff2dd, 0, 2.2, 0.75, 0.6, 1.2); spot.position.set(0, 1.15, 0.6); root.add(spot); root.add(spot.target);
+  const fill = new THREE.PointLight(0xcfe3ff, 0, 1.2, 1.5); fill.position.set(0, 0.95, 0.45); root.add(fill);
+  return { ITEMS, nb1, nb2, lcd, esp, enc, gameCase, glow, spot, fill, paintCase, coverDone: false, spin: 0, k: 0 };
+})();
+const EQ_LIFT = new V3(0, 0.74, 0.82);                    // where a picked item floats, facing the camera
+const EQ_TEXT = {
+  nb1: ['โน้ตบุ๊ก', 'รันเซิร์ฟเวอร์ MCP ไคลเอนต์ และโปรแกรม X-Plane 12'],
+  dev2A: ['โน้ตบุ๊กเครื่องที่สอง', 'รันหน้าจอ Aspen EFD1000'],
+  dev2B: ['จอ LCD + Raspberry Pi 3 Model A+', 'รันหน้าจอ Aspen EFD1000'],
+  esp: ['ESP32-C3 SuperMini', 'รับค่าจากปุ่มและ encoder แล้วส่งเข้าเครื่องที่รันจอ Aspen ผ่านสาย USB'],
+  enc: ['Rotary encoder และปุ่มกด', 'อุปกรณ์รับค่าจากผู้ใช้ ต่อเข้ากับ ESP32-C3'],
+  xp: ['X-Plane 12', 'โปรแกรมจำลองการบิน'],
+};
+function eqCard() {
+  const el = $('eq'); if (!el) return;
+  const on = step >= EQ_FIRST;
+  el.classList.toggle('show', on);
+  if (!on) return;
+  const idx = step - EQ_FIRST - 1, it = EQ.ITEMS[idx];
+  const key = it ? (it.key === 'dev2' ? 'dev2' + eqVariant : it.key) : null;
+  $('eq-tag').textContent = it ? `CHAPTER 3 · EQUIPMENT · ${idx + 1} / ${EQ.ITEMS.length}` : 'CHAPTER 3 · EQUIPMENT';
+  $('eq-title').textContent = key ? EQ_TEXT[key][0] : 'อุปกรณ์ที่ใช้ในโครงงาน';
+  $('eq-body').textContent = key ? EQ_TEXT[key][1] : 'อุปกรณ์ทั้งหมดวางอยู่บนเบาะหลัง เลื่อนเพื่อดูทีละชิ้น';
+  $('eq-var').textContent = eqVariant === 'A' ? 'แบบ A · โน้ตบุ๊ก  —  กด H เพื่อสลับ' : 'แบบ B · Raspberry Pi  —  กด H เพื่อสลับ';
+}
+function setEqVariant(v) { eqVariant = v; eqCard(); }
+function animateEquip(dt, t) {
+  if (!EQ.coverDone) {                                      // draw the cover once the logo image has decoded
+    EQ.coverDone = true; const img = new Image(); img.onload = () => EQ.paintCase(img); img.src = XPLANE_LOGO;
+  }
+  EQ.ITEMS[1].obj = eqVariant === 'A' ? EQ.nb2 : EQ.lcd;
+  EQ.nb2.visible = eqVariant === 'A'; EQ.lcd.visible = eqVariant === 'B';
+  const inEq = step >= EQ_FIRST, pick = inEq ? step - EQ_FIRST - 1 : -1, f = 1 - Math.exp(-dt * 4);
+  EQ.k += ((inEq ? 1 : 0) - EQ.k) * f;
+  EQ.spot.intensity = 3.5 * EQ.k; EQ.fill.intensity = 1.2 * EQ.k;
+  EQ.spin += dt * 0.55;
+  const liftW = EQ_LIFT;
+  EQ.ITEMS.forEach((it, i) => {
+    const o = it.obj, ud = o.userData, picked = i === pick;
+    ud.p = ud.p ?? 0; ud.p += ((picked ? 1 : 0) - ud.p) * f;
+    const [rx, ry, rz, tilt, yaw] = it.rest, p = ud.p, e = p * p * (3 - 2 * p);
+    const restTilt = it.key === 'dev2' && eqVariant === 'B' ? -Math.PI / 2 : tilt;
+    o.position.set(rx + (liftW.x - rx) * e, ry + (liftW.y - ry) * e + Math.sin(t * 2 + i) * 0.006 * e, rz + (liftW.z - rz) * e);
+    const big = it.key === 'dev2' && eqVariant === 'B' ? 1.7 : it.big;                     // the LCD is smaller than a notebook
+    o.scale.setScalar(1 + (big - 1) * e);
+    o.rotation.set(restTilt * (1 - e) + (it.key === 'esp' ? -1.05 : it.key === 'enc' ? -0.8 : it.key === 'dev2' && eqVariant === 'B' ? 0 : it.key === 'xp' ? 0 : 0.18) * e,
+                   yaw * (1 - e) + (Math.PI + EQ.spin) * e, 0);
+    if (it.key === 'xp') o.position.y -= 0.07 * e * it.big;                                  // stand the case near its centre
+    if (it.key === 'dev2' && eqVariant === 'B') o.position.y -= 0.085 * e * big;
+    if (ud.lid) ud.lid.rotation.x = ud.closed * (1 - e) + ud.open * e;                        // notebooks open as they rise
+    if (o === EQ.gameCase) ud.front.rotation.y = -1.15 * e;                                    // cover half open: art and disc both in view
+    if (o === EQ.enc) ud.knob.rotation.y = Math.sin(t * 0.8) * 1.2 * e;
+  });
+  EQ.glow.position.set(liftW.x, liftW.y - 0.17, liftW.z);
+  EQ.glow.material.opacity = (pick >= 0 ? 0.55 + Math.sin(t * 3) * 0.1 : 0) * EQ.k;
+  EQ.spot.target.position.copy(pick >= 0 ? liftW : new V3(0, 0.2, 0.85));
 }
 
 // ---------------------------------------------------------------------------
