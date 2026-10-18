@@ -2759,7 +2759,7 @@ addEventListener('mousemove', (e) => {
 // 3 = the hard-to-use instructor-station card · 4 = it collapses into one text box (camera pulls back)
 // 5 = second command clears the weather · 6 = customer benefits · 7 = manufacturer benefits
 let step = 0;
-const STEP_COUNT = 30;
+const stepCount = () => EQ_FIRST + 1 + eqItems().length;   // the equipment list is one shorter in variant B
 // chapter 3 · 17-23 = work-plan steps 1-7
 // chapter 2 · 8 LLM · 9 MCP · 10 ReAct · 11 X-Plane · 12 device control · 13-15 one research aircraft each · 16 summary
 // MCP mark from the official repo (modelcontextprotocol/modelcontextprotocol docs/logo/dark.svg), cropped to the icon
@@ -2814,7 +2814,7 @@ const aimAt = (obj) => { const p = lead.worldToLocal(obj.getWorldPosition(new V3
 let thHold = 0, thTimer = null;
 function goStep(n) {
   if (state !== 'cockpit') return;
-  n = Math.max(0, Math.min(STEP_COUNT - 1, n));
+  n = Math.max(0, Math.min(stepCount() - 1, n));
   if (n === step) return;
   thHold = step < 17 && n >= 17 ? performance.now() + 1700 : 0;   // entering chapter 3: zoom onto the navigator first, card after
   step = n;
@@ -3098,11 +3098,66 @@ const EQ = (() => {
     plane(0.104, 0.156, screenMat(aspenTex), 0, 0.085, 0.0042, g);
     box(0.112, 0.162, 0.003, Ms(0x8a8f96, 0.45, 0.6), 0, 0.085, -0.0055, g);               // metal back plate
     const pi = new THREE.Group(); pi.position.set(0, 0.085, -0.016); pi.rotation.z = Math.PI / 2; g.add(pi);
-    const piTex = canvasTex(650, 560, (c, W, H) => { c.fillStyle = '#1f7a3a'; c.fillRect(0, 0, W, H);
-      c.strokeStyle = 'rgba(210,190,120,.6)'; c.lineWidth = 3; for (let i = 0; i < 18; i++) { c.beginPath(); c.moveTo(Math.random() * W, Math.random() * H); c.lineTo(Math.random() * W, Math.random() * H); c.stroke(); }
-      c.fillStyle = '#e8e8e8'; c.font = '600 22px Rajdhani, sans-serif'; c.fillText('Raspberry Pi 3 Model A+', 40, H - 30);
-      for (let i = 0; i < 20; i++) for (let r = 0; r < 2; r++) { c.fillStyle = '#d9b14a'; c.beginPath(); c.arc(80 + i * 26, 30 + r * 26, 6, 0, 7); c.fill(); } });
-    box(0.065, 0.056, 0.0016, new THREE.MeshStandardMaterial({ map: piTex, roughness: 0.6 }), 0, 0, 0, pi);
+    // Raspberry Pi 3 Model A+ (65 x 56 mm), component side facing -z. The artwork lies on a plane turned to face that way,
+    // so board coordinates map to the canvas mirrored in x.
+    const PW = 0.065, PH = 0.056, piTex = canvasTex(1300, 1120, (c, W, H) => {
+      const P = (x, y) => [(-x / PW + 0.5) * W, (0.5 - y / PH) * H], S = W / PW;           // board metres -> canvas pixels
+      const sm = c.createLinearGradient(0, 0, W, H); sm.addColorStop(0, '#1d7a3f'); sm.addColorStop(0.5, '#17693a'); sm.addColorStop(1, '#125a31');
+      c.fillStyle = sm; c.beginPath(); c.roundRect(0, 0, W, H, 40); c.fill();
+      const route = (pts, w = 5, col = 'rgba(120,200,120,.55)') => {                       // copper under the solder mask: 45-degree routing
+        c.strokeStyle = col; c.lineWidth = w; c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath();
+        pts.forEach(([x, y], i) => { const [u, v] = P(x, y); i ? c.lineTo(u, v) : c.moveTo(u, v); }); c.stroke(); };
+      const via = (x, y) => { const [u, v] = P(x, y); c.fillStyle = '#c9a65a'; c.beginPath(); c.arc(u, v, 6, 0, 7); c.fill(); c.fillStyle = '#123d22'; c.beginPath(); c.arc(u, v, 2.5, 0, 7); c.fill(); };
+      // copper pour hatching near the edges, very faint
+      c.save(); c.globalAlpha = 0.08; c.strokeStyle = '#a8e0a8'; c.lineWidth = 2;
+      for (let k = -H; k < W; k += 18) { c.beginPath(); c.moveTo(k, 0); c.lineTo(k + H, H); c.stroke(); } c.restore();
+      // GPIO header -> SoC: a fan of parallel traces with 45-degree jogs
+      for (let i = 0; i < 18; i++) { const x = -0.0255 + i * 0.0027, xe = -0.011 + i * 0.0007;
+        route([[x, 0.0215], [x, 0.0185 - (i % 3) * 0.0006], [xe, 0.0115], [xe, 0.009]], 4); if (i % 4 === 1) via(x, 0.0172 - (i % 3) * 0.0006); }
+      // HDMI differential pairs down to the bottom edge
+      for (let i = 0; i < 8; i++) { const x = -0.0035 + i * 0.001, side = i < 4 ? -1 : 1;
+        route([[-0.009 + i * 0.0011, -0.005], [-0.009 + i * 0.0011, -0.012], [x, -0.016], [x, -0.0235]], 3.4, 'rgba(140,215,140,.6)'); }
+      // USB pairs to the USB-A port, power traces from the micro-USB
+      for (let i = 0; i < 4; i++) route([[0.002, -0.001 - i * 0.0012], [0.012, -0.001 - i * 0.0012], [0.018, -0.007 - i * 0.0012], [0.023, -0.007 - i * 0.0012]], 3.4, 'rgba(140,215,140,.6)');
+      route([[-0.02, -0.024], [-0.02, -0.018], [-0.014, -0.012], [-0.012, -0.012]], 16, 'rgba(120,200,120,.45)');
+      route([[-0.016, -0.024], [-0.016, -0.019], [-0.009, -0.0125]], 10, 'rgba(120,200,120,.45)');
+      // SoC <-> RAM / wireless / camera + display connectors
+      for (let i = 0; i < 6; i++) route([[-0.012, 0.004 - i * 0.0012], [-0.017, 0.004 - i * 0.0012], [-0.02, 0.001 - i * 0.0012], [-0.024, 0.001 - i * 0.0012]], 3);
+      for (let i = 0; i < 7; i++) route([[0.002, 0.006 - i * 0.0011], [0.008, 0.006 - i * 0.0011], [0.0105, 0.0085 - i * 0.0011]], 3);
+      for (let i = 0; i < 6; i++) route([[-0.012, 0.007 + i * 0.0006], [-0.022, 0.007 + i * 0.0006], [-0.025, 0.010 + i * 0.0006]], 3);
+      for (const [x, y] of [[-0.016, 0.0], [0.006, -0.009], [-0.004, 0.012], [0.015, 0.012], [-0.022, -0.016], [0.02, 0.016], [0.004, 0.017]]) via(x, y);
+      // silkscreen outlines and pads
+      const outline = (x, y, w, h) => { const [u, v] = P(x + w / 2, y + h / 2); c.strokeStyle = 'rgba(245,245,240,.85)'; c.lineWidth = 3; c.strokeRect(u, v, w * S, h * S); };
+      outline(-0.0055, 0.0015, 0.016, 0.016); outline(0.0045, 0.0005, 0.004, 0.018); outline(-0.0265, 0.0055, 0.004, 0.017);
+      outline(-0.0245, -0.0085, 0.012, 0.011); outline(0.03, -0.012, 0.017, 0.016); outline(0, -0.0255, 0.017, 0.008);
+      outline(-0.02, -0.0255, 0.009, 0.006); outline(0.016, -0.0245, 0.007, 0.008);
+      for (let i = 0; i < 20; i++) for (let r = 0; r < 2; r++) {                              // header pads (soldered, round + one square pin 1)
+        const [u, v] = P(-0.0255 + i * 0.0027, 0.0225 + r * 0.0027); c.fillStyle = '#d6b14d';
+        if (i === 0 && r === 0) c.fillRect(u - 13, v - 13, 26, 26); else { c.beginPath(); c.arc(u, v, 13, 0, 7); c.fill(); }
+        c.fillStyle = '#8a6a22'; c.beginPath(); c.arc(u, v, 5, 0, 7); c.fill(); }
+      for (const [x, y] of [[-0.0295, -0.0245], [0.0295, -0.0245], [-0.0295, 0.0245], [0.0295, 0.0245]]) {   // mounting holes
+        const [u, v] = P(x, y); c.fillStyle = '#d9b75a'; c.beginPath(); c.arc(u, v, 0.003 * S, 0, 7); c.fill(); c.fillStyle = '#0b2a17'; c.beginPath(); c.arc(u, v, 0.00135 * S, 0, 7); c.fill(); }
+      // small passives scattered along the busier nets
+      let sd = 5; const r2 = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 70; i++) { const x = -0.026 + r2() * 0.05, y = -0.02 + r2() * 0.036; if (Math.abs(x + 0.005) < 0.009 && Math.abs(y - 0.002) < 0.009) continue;
+        const [u, v] = P(x, y), rot = r2() > 0.5; c.fillStyle = r2() > 0.4 ? '#3b3a36' : '#b98a5a'; c.fillRect(u - (rot ? 6 : 10), v - (rot ? 10 : 6), rot ? 12 : 20, rot ? 20 : 12);
+        c.fillStyle = '#cfcfcf'; rot ? (c.fillRect(u - 6, v - 10, 12, 4), c.fillRect(u - 6, v + 6, 12, 4)) : (c.fillRect(u - 10, v - 6, 4, 12), c.fillRect(u + 6, v - 6, 4, 12)); }
+      // silkscreen text
+      c.fillStyle = 'rgba(248,248,244,.92)'; c.textAlign = 'left'; c.textBaseline = 'middle';
+      const [tx, ty] = P(0.026, -0.0185); c.font = '700 40px Rajdhani, sans-serif'; c.fillText('Raspberry Pi 3 Model A+', tx, ty);
+      c.font = '600 28px Rajdhani, sans-serif'; c.fillText('© Raspberry Pi 2018', tx, ty + 42);
+      const [gx, gy] = P(-0.0255, 0.0175); c.font = '600 24px Rajdhani, sans-serif'; c.fillText('GPIO', gx - 70, gy);
+      const lab = (t, x, y) => { const [u, v] = P(x, y); c.font = '600 24px Rajdhani, sans-serif'; c.fillText(t, u, v); };
+      lab('CAMERA', 0.0095, 0.012); lab('DISPLAY', -0.0225, 0.016); lab('HDMI', 0.006, -0.019); lab('PWR IN', -0.017, -0.019); lab('A/V', 0.0185, -0.0185);
+    });
+    box(PW, PH, 0.0016, Ms(0x165f35, 0.55), 0, 0, 0, pi);
+    const art = plane(PW - 0.0004, PH - 0.0004, new THREE.MeshStandardMaterial({ map: piTex, roughness: 0.42, metalness: 0.1 }), 0, 0, -0.00085, pi);
+    art.rotation.y = Math.PI;                                                                 // face the component side
+    box(0.01, 0.009, 0.0016, Ms(0xb9bcc2, 0.3, 0.9), -0.0185, -0.003, -0.0016, pi);        // wireless module shield
+    box(0.003, 0.017, 0.0028, Ms(0xece6d4, 0.5), 0.0045, 0.0005, -0.0018, pi);            // CSI camera connector
+    box(0.003, 0.017, 0.0028, Ms(0xece6d4, 0.5), -0.0265, 0.0055, -0.0018, pi);           // DSI display connector
+    box(0.008, 0.005, 0.0028, Ms(0xb9bcc2, 0.3, 0.9), -0.02, -0.0255, -0.0018, pi);       // micro-USB power
+    { const jack = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.007, 16), Ms(0x111111, 0.5)); jack.rotation.x = Math.PI / 2; jack.position.set(0.016, -0.0245, -0.0045); pi.add(jack); }
     box(0.014, 0.014, 0.0015, Ms(0x222222, 0.4, 0.3), -0.005, 0.002, -0.0016, pi);         // SoC (under the metal-look cap)
     box(0.012, 0.012, 0.001, Ms(0xc8c8c8, 0.3, 0.9), -0.005, 0.002, -0.003, pi);
     box(0.015, 0.014, 0.007, Ms(0xb9bcc2, 0.3, 0.9), 0.03, -0.012, -0.004, pi);            // USB-A
@@ -3200,11 +3255,12 @@ const EQ = (() => {
     return g;
   })();
   const ITEMS = [   // rest pose on the bench, scale and lift height when picked
-    { key: 'nb1', obj: nb1, rest: [-0.27, 0.205, 0.96, 0, 0.12], big: 1.0 },          // above the lap belts
-    { key: 'dev2', obj: null, rest: [0.27, 0.205, 0.96, 0, -0.1], big: 1.0 },
-    { key: 'esp', obj: esp, rest: [-0.13, 0.17, 0.74, 0, 0.6], big: 9 },
-    { key: 'enc', obj: enc, rest: [-0.38, 0.17, 0.74, 0, -0.3], big: 4.4 },
-    { key: 'xp', obj: gameCase, rest: [0.27, 0.175, 0.74, -Math.PI / 2, 0.25], big: 1.15 },
+    // rest yaw is already turned towards the camera, so an item rises without swinging round
+    { key: 'nb1', obj: nb1, rest: [-0.27, 0.205, 0.96, 0, Math.PI + 0.12], big: 1.0 },          // above the lap belts
+    { key: 'dev2', obj: null, rest: [0.27, 0.205, 0.96, 0, Math.PI - 0.1], big: 1.0 },
+    { key: 'esp', obj: esp, rest: [-0.13, 0.17, 0.74, 0, Math.PI + 0.35], big: 9 },
+    { key: 'enc', obj: enc, rest: [-0.38, 0.17, 0.74, 0, Math.PI - 0.3], big: 4.4 },
+    { key: 'xp', obj: gameCase, rest: [0.27, 0.175, 0.74, -Math.PI / 2, Math.PI + 0.25], big: 1.15 },
   ];
   for (const o of [nb1, nb2, lcd, esp, enc, gameCase]) root.add(o);
   lcd.userData.restTilt = -Math.PI / 2;
@@ -3221,42 +3277,45 @@ const EQ_TEXT = {
   dev2B: ['จอ LCD + Raspberry Pi 3 Model A+', 'รันหน้าจอ Aspen EFD1000'],
   esp: ['ESP32-C3 SuperMini', 'รับค่าจากปุ่มและ encoder แล้วส่งเข้าเครื่องที่รันจอ Aspen ผ่านสาย USB'],
   enc: ['Rotary encoder และปุ่มกด', 'อุปกรณ์รับค่าจากผู้ใช้ ต่อเข้ากับ ESP32-C3'],
+  encB: ['Rotary encoder และปุ่มกด', 'อุปกรณ์รับค่าจากผู้ใช้'],
   xp: ['X-Plane 12', 'โปรแกรมจำลองการบิน'],
 };
+const eqItems = () => EQ.ITEMS.filter((it) => !(eqVariant === 'B' && it.key === 'esp'));   // variant B has no ESP32-C3
 function eqCard() {
   const el = $('eq'); if (!el) return;
   const on = step >= EQ_FIRST;
   el.classList.toggle('show', on);
   if (!on) return;
-  const idx = step - EQ_FIRST - 1, it = EQ.ITEMS[idx];
-  const key = it ? (it.key === 'dev2' ? 'dev2' + eqVariant : it.key) : null;
-  $('eq-tag').textContent = it ? `CHAPTER 3 · EQUIPMENT · ${idx + 1} / ${EQ.ITEMS.length}` : 'CHAPTER 3 · EQUIPMENT';
+  const list = eqItems(), idx = step - EQ_FIRST - 1, it = list[idx];
+  const key = it ? (it.key === 'dev2' || it.key === 'enc' ? it.key + (it.key === 'dev2' || eqVariant === 'B' ? eqVariant : '') : it.key) : null;
+  $('eq-tag').textContent = it ? `CHAPTER 3 · EQUIPMENT · ${idx + 1} / ${list.length}` : 'CHAPTER 3 · EQUIPMENT';
   $('eq-title').textContent = key ? EQ_TEXT[key][0] : 'อุปกรณ์ที่ใช้ในโครงงาน';
   $('eq-body').textContent = key ? EQ_TEXT[key][1] : 'อุปกรณ์ทั้งหมดวางอยู่บนเบาะหลัง เลื่อนเพื่อดูทีละชิ้น';
   $('eq-var').textContent = eqVariant === 'A' ? 'แบบ A · โน้ตบุ๊ก  —  กด H เพื่อสลับ' : 'แบบ B · Raspberry Pi  —  กด H เพื่อสลับ';
 }
-function setEqVariant(v) { eqVariant = v; eqCard(); }
+function setEqVariant(v) { eqVariant = v; if (step >= stepCount()) goStep(stepCount() - 1); eqCard(); }
 function animateEquip(dt, t) {
   if (!EQ.coverDone) {                                      // draw the cover once the logo image has decoded
     EQ.coverDone = true; const img = new Image(); img.onload = () => EQ.paintCase(img); img.src = XPLANE_LOGO;
   }
   EQ.ITEMS[1].obj = eqVariant === 'A' ? EQ.nb2 : EQ.lcd;
   EQ.nb2.visible = eqVariant === 'A'; EQ.lcd.visible = eqVariant === 'B';
-  const inEq = step >= EQ_FIRST, pick = inEq ? step - EQ_FIRST - 1 : -1, f = 1 - Math.exp(-dt * 4);
+  const list = eqItems(), inEq = step >= EQ_FIRST, pickIt = inEq ? list[step - EQ_FIRST - 1] : null, pick = pickIt ? 1 : -1, f = 1 - Math.exp(-dt * 4);
+  EQ.esp.visible = eqVariant === 'A';
   EQ.k += ((inEq ? 1 : 0) - EQ.k) * f;
   EQ.spot.intensity = 3.5 * EQ.k; EQ.fill.intensity = 1.2 * EQ.k;
-  EQ.spin += dt * 0.55;
   const liftW = EQ_LIFT;
   EQ.ITEMS.forEach((it, i) => {
-    const o = it.obj, ud = o.userData, picked = i === pick;
+    const o = it.obj, ud = o.userData, picked = it === pickIt;
     ud.p = ud.p ?? 0; ud.p += ((picked ? 1 : 0) - ud.p) * f;
+    ud.spin = picked ? (ud.p > 0.97 ? (ud.spin ?? 0) + dt * 0.3 : ud.spin ?? 0) : ud.p < 0.02 ? 0 : ud.spin ?? 0;   // turn slowly, and only once it has arrived
     const [rx, ry, rz, tilt, yaw] = it.rest, p = ud.p, e = p * p * (3 - 2 * p);
     const restTilt = it.key === 'dev2' && eqVariant === 'B' ? -Math.PI / 2 : tilt;
     o.position.set(rx + (liftW.x - rx) * e, ry + (liftW.y - ry) * e + Math.sin(t * 2 + i) * 0.006 * e, rz + (liftW.z - rz) * e);
     const big = it.key === 'dev2' && eqVariant === 'B' ? 1.7 : it.big;                     // the LCD is smaller than a notebook
     o.scale.setScalar(1 + (big - 1) * e);
     o.rotation.set(restTilt * (1 - e) + (it.key === 'esp' ? -1.05 : it.key === 'enc' ? -0.8 : it.key === 'dev2' && eqVariant === 'B' ? 0 : it.key === 'xp' ? 0 : 0.18) * e,
-                   yaw * (1 - e) + (Math.PI + EQ.spin) * e, 0);
+                   yaw + Math.atan2(Math.sin(Math.PI + ud.spin - yaw), Math.cos(Math.PI + ud.spin - yaw)) * e, 0);   // shortest way round
     if (it.key === 'xp') o.position.y -= 0.07 * e * it.big;                                  // stand the case near its centre
     if (it.key === 'dev2' && eqVariant === 'B') o.position.y -= 0.085 * e * big;
     if (ud.lid) ud.lid.rotation.x = ud.closed * (1 - e) + ud.open * e;                        // notebooks open as they rise
