@@ -2855,6 +2855,7 @@ function startOutro() {
     },
     onComplete: pullOut });
   step = 0; showChapter2();                                                     // clears the diagrams and brings the midday sky back
+  aspenDemo = false; setAspenBright(ASPEN_DIM, 0.1); playChat(null); setWeather(0, 1.2);
 }
 function pullOut() {
   eyeOff.set(0, 0, 0); eyeOffT.set(0, 0, 0);
@@ -2930,31 +2931,53 @@ const PAPERS = [
 ];
 const CHATS = {
   rain:  { cmd: 'ขอฝนตกหนัก ทัศนวิสัยต่ำ แล้วให้ระบบสุญญากาศเสีย', reply: 'ตั้งฝนตกหนัก ลดทัศนวิสัย และจำลองระบบสุญญากาศเสียเรียบร้อยครับ', wx: 1 },
+  // device control: maps to the set_mfd_brightness tool (display.py), which runs set_brightness.sh on the display computer over SSH
+  bright: { cmd: 'ห้องนักบินมืดลง ขอเพิ่มความสว่างจอ Aspen เป็น 100%', reply: 'ตั้งความสว่างจอ Aspen EFD1000 เป็น 100% แล้วครับ', wx: 1, bright: 1 },
   clear: { cmd: 'ขอให้อากาศกลับมาปลอดโปร่ง และซ่อมระบบสุญญากาศ', reply: 'ปรับสภาพอากาศเป็นท้องฟ้าโปร่ง และยกเลิกความเสียหายของระบบสุญญากาศแล้วครับ', wx: 0 },
 };
-let typeTimer = null, chatKey = null;
+let typeTimer = null, typeDelay = null, chatKey = null;
+const ASPEN_DIM = 0.72;                                   // display brightness before the demo command (about 70 %)
+const aspenLevel = { v: ASPEN_DIM };
+function setAspenBright(v, dur = 1.4) {
+  const m = hotspots.find((o) => o.name === 'aspen');
+  gsap.to(aspenLevel, { v, duration: dur, ease: 'sine.inOut', overwrite: true, onUpdate: () => m && m.material.color.setScalar(aspenLevel.v) });
+}
+hotspots.find((o) => o.name === 'aspen').material.color.setScalar(ASPEN_DIM);
 function playChat(key, instant = false) {
-  clearInterval(typeTimer); $('chat-reply').classList.remove('show');
+  clearInterval(typeTimer); clearTimeout(typeDelay); $('chat-reply').classList.remove('show');   // cancel any command still waiting to type
   if (!key) { chatKey = null; $('chat-text').textContent = ''; return; }
   const c = CHATS[key];
   if (key === chatKey) { $('chat-reply').classList.add('show'); return; }
   chatKey = key;
   $('chat-reply').textContent = c.reply;
-  if (instant) { $('chat-text').textContent = c.cmd; $('chat-reply').classList.add('show'); setWeather(c.wx, 1.2); return; }
+  if (instant) { $('chat-text').textContent = c.cmd; $('chat-reply').classList.add('show'); setWeather(c.wx, 1.2); if ('bright' in c) setAspenBright(c.bright, 0.4); return; }
   const chars = [...c.cmd]; let i = 0; $('chat-text').textContent = '';
-  setTimeout(() => { typeTimer = setInterval(() => {
+  typeDelay = setTimeout(() => { const me = typeTimer = setInterval(() => {
+    if (chatKey !== key) { clearInterval(me); return; }
     $('chat-text').textContent += chars[i++] || '';
     if (i >= chars.length) {
-      clearInterval(typeTimer);
-      setTimeout(() => { if (chatKey !== key) return; $('chat-reply').classList.add('show'); setWeather(c.wx); }, 450);
+      clearInterval(me);
+      setTimeout(() => { if (chatKey !== key) return; $('chat-reply').classList.add('show'); setWeather(c.wx); if ('bright' in c) setAspenBright(c.bright); }, 450);
     }
   }, 45); }, 700);
 }
 const aimAt = (obj) => { const p = lead.worldToLocal(obj.getWorldPosition(new V3())).sub(EYE); return { yaw: Math.atan2(-p.x, -p.z), pitch: Math.atan2(p.y, Math.hypot(p.x, p.z)) }; };
-let thHold = 0, thTimer = null;
+let thHold = 0, thTimer = null, aspenDemo = false;
+function aspenBeat(on) {                                  // frame the Aspen and move the chat aside so the display change is seen
+  gsap.killTweensOf(look); look.locked = true;
+  const a = aimAt(hotspots.find((o) => o.name === 'aspen'));
+  gsap.to(look, on ? { tYaw: a.yaw - 0.05, tPitch: a.pitch, tFov: 30, duration: 1.3, ease: 'power2.inOut' }
+                   : { tYaw: 0, tPitch: -0.2, tFov: 66, duration: 1.1, ease: 'power2.inOut' });
+  $('chat').classList.toggle('docked', on);
+}
 function goStep(n) {
   if (state !== 'cockpit') return;
   if (n > stepCount() - 1 && step === stepCount() - 1) { startOutro(); return; }   // scrolling past the last item ends the tour
+  // between the rain (4) and the clear-up (5) there is one extra beat: the AI turns the Aspen display up (same step number)
+  if (step === 4 && n === 5 && !aspenDemo) { aspenDemo = true; aspenBeat(true); playChat('bright'); return; }
+  if (step === 4 && n === 3 && aspenDemo) { aspenDemo = false; aspenBeat(false); playChat('rain', true); setAspenBright(ASPEN_DIM, 0.6); return; }
+  if (step === 5 && n === 4) aspenDemo = true;
+  if (n < 4) { aspenDemo = false; if (aspenLevel.v !== ASPEN_DIM) setAspenBright(ASPEN_DIM, 0.6); }
   n = Math.max(0, Math.min(stepCount() - 1, n));
   if (n === step) return;
   thHold = step < 17 && n >= 17 ? performance.now() + 1700 : 0;   // entering chapter 3: zoom onto the navigator first, card after
@@ -2991,13 +3014,14 @@ function goStep(n) {
   $('ios').classList.toggle('show', step === 3);
   $('ios').classList.toggle('collapse', step >= 4);
   if (step <= 7) {
-    const want = step === 4 ? 'rain' : step >= 5 ? 'clear' : null;
-    const back = want === 'rain' && chatKey === 'clear';            // stepping back from 5: snap, don't retype
+    const want = step === 4 ? (aspenDemo ? 'bright' : 'rain') : step >= 5 ? 'clear' : null;
+    const back = (want === 'rain' || want === 'bright') && chatKey === 'clear';   // stepping back from 5: snap, don't retype
     if (want !== chatKey) playChat(want, back);
     if (!want) setWeather(0, 1.2);
   }
   $('chat').classList.toggle('show', step >= 4 && step <= 7);
   $('chat').classList.toggle('docked', step >= 6);
+  if (step === 4 && aspenDemo) aspenBeat(true);                    // came back from 5 into the brightness beat
   $('benL').classList.toggle('show', step >= 6 && step <= 7);
   $('benR').classList.toggle('show', step === 7);
   showChapter2();
