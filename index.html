@@ -2930,19 +2930,30 @@ const PAPERS = [
     near: 'ที่มาของมาตรการจำกัดขอบเขตการสั่งงาน (วัตถุประสงค์ข้อ 5)', diff: 'เป็นงานวิเคราะห์ ไม่ได้สร้างระบบ' },
 ];
 const CHATS = {
-  rain:  { cmd: 'ขอฝนตกหนัก ทัศนวิสัยต่ำ แล้วให้ระบบสุญญากาศเสีย', reply: 'ตั้งฝนตกหนัก ลดทัศนวิสัย และจำลองระบบสุญญากาศเสียเรียบร้อยครับ', wx: 1 },
+  rain:  { cmd: 'ขอฝนตกหนัก ทัศนวิสัยต่ำ แล้วให้ระบบสุญญากาศเสีย', reply: 'ตั้งฝนตกหนัก ลดทัศนวิสัย และจำลองระบบสุญญากาศเสียเรียบร้อยครับ', wx: 1, bright: 0.38 },   // storm: the display looks dim
   // device control: maps to the set_mfd_brightness tool (display.py), which runs set_brightness.sh on the display computer over SSH
-  bright: { cmd: 'ห้องนักบินมืดลง ขอเพิ่มความสว่างจอ Aspen เป็น 100%', reply: 'ตั้งความสว่างจอ Aspen EFD1000 เป็น 100% แล้วครับ', wx: 1, bright: 1 },
+  bright: { cmd: 'ห้องนักบินมืดมาก ขอปรับความสว่างจอ Aspen เป็น 100%', reply: 'ตั้งความสว่างจอ Aspen EFD1000 เป็น 100% แล้วครับ', wx: 1, bright: 1 },
   clear: { cmd: 'ขอให้อากาศกลับมาปลอดโปร่ง และซ่อมระบบสุญญากาศ', reply: 'ปรับสภาพอากาศเป็นท้องฟ้าโปร่ง และยกเลิกความเสียหายของระบบสุญญากาศแล้วครับ', wx: 0 },
 };
 let typeTimer = null, typeDelay = null, chatKey = null;
-const ASPEN_DIM = 0.72;                                   // display brightness before the demo command (about 70 %)
+const ASPEN_DIM = 0.85;                                   // normal look of the display before the storm
 const aspenLevel = { v: ASPEN_DIM };
-function setAspenBright(v, dur = 1.4) {
-  const m = hotspots.find((o) => o.name === 'aspen');
-  gsap.to(aspenLevel, { v, duration: dur, ease: 'sine.inOut', overwrite: true, onUpdate: () => m && m.material.color.setScalar(aspenLevel.v) });
+// at 100 % the screen also throws a soft glow around its bezel and a little blue light onto the panel and yoke
+const aspenScr = hotspots.find((o) => o.name === 'aspen');
+const aspenHalo = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.23), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false,
+  blending: THREE.AdditiveBlending, toneMapped: false, map: canvasTex(256, 256, (g) => { const r = g.createRadialGradient(128, 128, 30, 128, 128, 128);
+    r.addColorStop(0, 'rgba(170,205,255,1)'); r.addColorStop(0.55, 'rgba(120,170,255,.35)'); r.addColorStop(1, 'rgba(120,170,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }) }));
+aspenHalo.position.copy(aspenScr.position); aspenHalo.position.z += 0.004; aspenScr.parent.add(aspenHalo);
+const aspenSpill = new THREE.PointLight(0xa8ccff, 0, 1.1, 1.6); aspenSpill.position.copy(aspenScr.position); aspenSpill.position.z += 0.16; aspenScr.parent.add(aspenSpill);
+function applyAspenLevel() {
+  const v = aspenLevel.v, boost = Math.max(0, (v - ASPEN_DIM) / (1 - ASPEN_DIM));
+  aspenScr.material.color.setScalar(v);
+  aspenHalo.material.opacity = 0.45 * boost; aspenSpill.intensity = 0.9 * boost;
 }
-hotspots.find((o) => o.name === 'aspen').material.color.setScalar(ASPEN_DIM);
+function setAspenBright(v, dur = 1.4) {
+  gsap.to(aspenLevel, { v, duration: dur, ease: 'sine.inOut', overwrite: true, onUpdate: applyAspenLevel });
+}
+applyAspenLevel();
 function playChat(key, instant = false) {
   clearInterval(typeTimer); clearTimeout(typeDelay); $('chat-reply').classList.remove('show');   // cancel any command still waiting to type
   if (!key) { chatKey = null; $('chat-text').textContent = ''; return; }
@@ -2975,7 +2986,7 @@ function goStep(n) {
   if (n > stepCount() - 1 && step === stepCount() - 1) { startOutro(); return; }   // scrolling past the last item ends the tour
   // between the rain (4) and the clear-up (5) there is one extra beat: the AI turns the Aspen display up (same step number)
   if (step === 4 && n === 5 && !aspenDemo) { aspenDemo = true; aspenBeat(true); playChat('bright'); return; }
-  if (step === 4 && n === 3 && aspenDemo) { aspenDemo = false; aspenBeat(false); playChat('rain', true); setAspenBright(ASPEN_DIM, 0.6); return; }
+  if (step === 4 && n === 3 && aspenDemo) { aspenDemo = false; aspenBeat(false); playChat('rain', true); return; }   // instant replay of 'rain' dims it again
   if (step === 5 && n === 4) aspenDemo = true;
   if (n < 4) { aspenDemo = false; if (aspenLevel.v !== ASPEN_DIM) setAspenBright(ASPEN_DIM, 0.6); }
   n = Math.max(0, Math.min(stepCount() - 1, n));
