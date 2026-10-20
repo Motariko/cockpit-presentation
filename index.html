@@ -287,7 +287,7 @@
   <div class="reply" id="chat-reply"></div>
 </div>
 <div id="benL" class="benefit glass" aria-hidden="true">
-  <div class="tag">CUSTOMER</div><h3>ลูกค้า (ครูฝึก) ได้อะไร</h3>
+  <div class="tag">USER</div><h3>ผู้ใช้งานได้อะไร</h3>
   <ul><li><svg viewBox="0 0 24 24"><path d="M2 13l8-2 4-8 2 1-2 7 6 1 2 3-8 0-4 6-2-1 1-5-7-2z"/></svg><div><b>ผู้ช่วยที่รู้จักเครื่องบินแต่ละรุ่น</b><span>ไม่ต้องศึกษาแผงหน้าปัดหรือระบบใหม่ทุกครั้งที่เปลี่ยนรุ่น</span></div></li><li><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><div><b>สั่งงานได้เร็ว ใช้งานง่าย</b><span>ไม่ต้องจำว่าฟังก์ชันอยู่เมนูไหน</span></div></li><li><svg viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></svg><div><b>รู้สถานะอุปกรณ์ได้ทันที</b><span>ถามระบบได้เลยว่าอุปกรณ์ทำงานปกติหรือไม่</span></div></li></ul>
 </div>
 <div id="benR" class="benefit glass" aria-hidden="true">
@@ -3210,7 +3210,7 @@ function frame() {
 
 // ======================= equipment on the rear bench: lifted one at a time, like picking an item in a game =======================
 const EQ_FIRST = 24;                                        // overview step; items follow at 25..29
-let eqVariant = 'A';                                        // A: second notebook runs the Aspen screen, B: LCD + Raspberry Pi 3 Model A+
+let eqVariant = 'B';                                        // B (default): LCD + Raspberry Pi 3 Model A+, A: second notebook runs the Aspen screen
 const EQ = (() => {
   const root = new THREE.Group(); cockpit.add(root);
   const Ms = (c, r = 0.5, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
